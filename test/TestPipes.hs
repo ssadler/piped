@@ -24,8 +24,6 @@ import Control.Monad.State
 
 import Data.Void
 
-import Debug.Trace
-
 class Monad m => PipeLike p i o m where
   await :: p i o m (Maybe i)
   yield :: o -> p i o m ()
