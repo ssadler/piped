@@ -21,7 +21,7 @@ scanl :: Monad m => (a -> b -> a) -> a -> Pipe b a m ()
 scanl f =
   fix $ \next s ->
     let go i = yield s >> next (f s i)
-     in await >>= maybe (yield s) go
+     in await (yield s) go
 
 -- | Consume all input and return a list
 sinkList :: Monad m => Pipe i Void m [i]
@@ -34,18 +34,17 @@ awaitForever f = Pipe $
   \rest ->
     fix $
       \next await yield -> 
-        runAwait' await $
-          \await' ->
-            let run i = unPipe (f i) (\l r () -> next l r) await' yield
-             in maybe (rest await' yield ()) run
+        runAwait await (rest termLeft yield ()) $
+          \i await' ->
+            unPipe (f i) (\l r () -> next l r) await' yield
 {-# INLINE awaitForever #-}
 
 foldl :: Monad m => (a -> i -> a) -> a -> Pipe i Void m a
 foldl f start = Pipe $
   \rest ->
     let next s l r =
-          runAwait' l $ \await' ->
-            maybe (rest await' r s) (\i -> next (f s i) await' r)
+          runAwait l (rest termLeft r s) $
+            \i await' -> next (f s i) await' r
      in next start
 {-# INLINE foldl #-}
 
@@ -54,11 +53,10 @@ sinkNull = Pipe $
   \rest ->
     fix $
       \f l r ->
-        runAwait' l $
-          \l -> maybe (rest l r ()) $ \_ -> f l r
+        runAwait l (rest termLeft r ()) $ \i l' -> f l' r
 
 awaitJust :: Monad m => (i -> Pipe i o m ()) -> Pipe i o m ()
-awaitJust f = await >>= maybe (pure ()) f
+awaitJust f = await (pure ()) f
 
 dropWhile_ :: Monad m => (i -> Bool) -> Pipe i i m ()
 dropWhile_ f =
@@ -94,21 +92,22 @@ zip_ :: Monad m => Pipe () o m () -> Pipe () o m () -> Pipe () (o, o) m ()
 zip_ (Pipe f1) (Pipe f2) = Pipe $
   \rest _ r -> do
 
-    let loop' (Just i1) a1 (Just i2) a2 yield = do
-          runYield yield (Just (i1, i2)) $ \yield' -> do
-            runAwait a1 $ \i1' a1' -> do
-              runAwait a2 $ \i2' a2' -> do
+    let exit y = rest termLeft y ()
+        loop' i1 a1 i2 a2 yield = do
+          runYield yield (i1, i2) $ \yield' -> do
+            runAwait a1 (exit yield) $ \i1' a1' -> do
+              runAwait a2 (exit yield) $ \i2' a2' -> do
                 loop' i1' a1' i2' a2' yield'
-        loop' _ _ _ _ yield = rest mempty yield ()
 
-        y1 = Yield $ \mi1 a1 ->
-              let y2 = Yield $ \mi2 a2 ->
-                    loop' mi1 a1 mi2 a2 r
-               in f2 (\_ r () -> terminate r) mempty y2
+        runSide f = f (\_ r () -> terminate r) (Await terminate)
 
-        terminate y = runYield y Nothing terminate
+        termRight = rest termLeft r ()
 
-     in f1 (\_ r () -> terminate r) mempty y1
+     in runSide f1 $
+          Yield termRight $ \i1 a1 ->
+            runSide f2 $
+              Yield termRight $ \i2 a2 ->
+                loop' i1 a1 i2 a2 r
 
 
 concat_ :: Monad m => Pipe [i] i m ()
