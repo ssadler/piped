@@ -22,9 +22,7 @@ runSink sink n =
   runPipe $ replicateM_ n (yield ()) .| sink
 
 sinkNullM :: Monad m => Pipe i Void m ()
-sinkNullM =
-  let f = awaitForever $ \_ -> f
-   in f
+sinkNullM = awaitForever mempty
 
 sinkList' :: Pipe i Void m [i]
 sinkList' = Pipe $

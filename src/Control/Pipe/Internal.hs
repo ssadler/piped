@@ -19,6 +19,7 @@ module Control.Pipe.Internal
   , termLeft
   , sinkVoid
   , injectLeftover
+  , Void
   ) where
 
 

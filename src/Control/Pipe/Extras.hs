@@ -7,7 +7,6 @@ module Control.Pipe.Extras where
 import Control.Monad.Trans.Resource
 
 import Control.Pipe.Internal
-import Control.Monad.IO.Unlift
 
 import Data.Void
 import Data.Function (fix)

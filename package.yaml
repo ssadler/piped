@@ -23,26 +23,9 @@ dependencies:
 - conduit
 - mtl
 - resourcet
-- unliftio-core
 
 library:
   source-dirs: src
-
-
-  #executables:
-  #  piped-bench:
-  #    main:                Bench.hs
-  #    source-dirs:         bench
-  #    ghc-options:
-  #    - -rtsopts
-  #    - -O2
-  #    - -fprof-auto
-  #    dependencies:
-  #    - piped
-  #    - criterion
-  #    default-extensions:
-  #    - LambdaCase
-
 
 
 tests:
@@ -65,3 +48,16 @@ tests:
     - conduit
     default-extensions:
     - RankNTypes
+
+  piped-bench:
+    main:                Bench.hs
+    source-dirs:         bench
+    ghc-options:
+    - -rtsopts
+    - -O2
+    - -fprof-auto
+    dependencies:
+    - piped
+    - criterion == 1.4.1.0
+    default-extensions:
+    - LambdaCase
