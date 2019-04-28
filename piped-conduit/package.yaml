@@ -1,0 +1,17 @@
+name:                piped-conduit
+version:             0.1.0.0
+github:              "githubuser/piped-conduit"
+license:             BSD3
+author:              "Author name here"
+maintainer:          "example@example.com"
+copyright:           "2019 Author name here"
+
+description:         Please see the README on GitHub at <https://github.com/githubuser/piped-conduit#readme>
+
+dependencies:
+- base >= 4.7 && < 5
+- piped
+- conduit
+
+library:
+  source-dirs: src

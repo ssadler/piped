@@ -1,6 +1,5 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE RankNTypes #-}
-{-# LANGUAGE Strict #-}
 
 module Control.Pipe.Extras where
 
@@ -19,11 +18,22 @@ yieldM = (>>= yield)
 map :: Monad m => (i -> o) -> Pipe i o m ()
 map f = awaitForever $ yield . f
 
-scanl :: Monad m => (a -> b -> a) -> a -> Pipe b a m ()
-scanl f =
-  fix $ \next s ->
-    let go i = yield s >> next (f s i)
-     in awaitMaybe (yield s) go
+-- scanl :: Monad m => (a -> b -> a) -> a -> Pipe b a m ()
+-- scanl f =
+--   fix $ \next s ->
+--     let go i = yield s >> next (f s i)
+--      in awaitMaybe (yield s) go
+
+scanl :: forall i o m. (o -> i -> o) -> o -> Pipe i o m ()
+scanl f s = Pipe $
+  \rest ->
+    fix1 s $
+      \next s l r ->
+        runYield r s $ \r -> 
+          let end = rest l r ()
+           in runAwait l end $ \i l ->
+                let s' = f s i
+                 in s' `seq` next s' l r
 
 sourceList :: Monad m => [o] -> Pipe () o m ()
 sourceList = foldMap yield
@@ -68,16 +78,30 @@ awaitMaybe def act = Pipe $
 {-# INLINE awaitMaybe #-}
 
 awaitJust :: Monad m => (i -> Pipe i o m ()) -> Pipe i o m ()
-awaitJust = awaitMaybe (pure ())
+awaitJust act = Pipe $
+  \rest l r ->
+    let run (Pipe p) l = p rest l r
+     in runAwait l (rest termLeft r ()) $ run . act
 {-# INLINE awaitJust #-}
 
-dropWhile_ :: Monad m => (i -> Bool) -> Pipe i i m ()
-dropWhile_ f =
-  awaitJust (\i -> if f i then dropWhile_ f else yield i >> identity_)
-
 takeWhile_ :: Monad m => (i -> Bool) -> Pipe i i m ()
-takeWhile_ f =
-  awaitJust (\i -> if f i then yield i >> takeWhile_ f else pure ())
+takeWhile_ f = Pipe $
+  \rest ->
+    fix $ \next l r ->
+      runAwait l (rest termLeft r ()) $ \i l ->
+        if f i
+           then runYield r i $ next l
+           else rest l r ()
+
+
+dropWhile_ :: Monad m => (i -> Bool) -> Pipe i i m ()
+dropWhile_ f = Pipe $
+  \rest ->
+    fix $ \next l r ->
+      runAwait l (rest termLeft r ()) $ \i l ->
+        if f i
+           then next l r
+           else unPipe identity_ rest l r
 
 identity_ :: Monad m => Pipe i i m ()
 identity_ = awaitForever yield

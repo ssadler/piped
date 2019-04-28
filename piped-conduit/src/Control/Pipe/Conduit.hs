@@ -9,6 +9,8 @@ import Control.Pipe.Extras
 import Data.Conduit.Internal hiding (Pipe)
 
 
+-- | Convert a ConduitT to a Pipe
+--
 fromConduit :: Monad m => ConduitT i o m a -> Pipe i o m a
 fromConduit (ConduitT c) = Pipe $
   \rest ->

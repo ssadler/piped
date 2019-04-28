@@ -1,3 +1,3 @@
-# Changelog for piped
+# Changelog for piped-conduit
 
 ## Unreleased changes
