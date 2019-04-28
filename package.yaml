@@ -20,13 +20,30 @@ description:         Please see the README on GitHub at <https://github.com/gith
 
 dependencies:
 - base >= 4.7 && < 5
-- containers
+- conduit
 - mtl
 - resourcet
-- exceptions
+- unliftio-core
 
 library:
   source-dirs: src
+
+
+  #executables:
+  #  piped-bench:
+  #    main:                Bench.hs
+  #    source-dirs:         bench
+  #    ghc-options:
+  #    - -rtsopts
+  #    - -O2
+  #    - -fprof-auto
+  #    dependencies:
+  #    - piped
+  #    - criterion
+  #    default-extensions:
+  #    - LambdaCase
+
+
 
 tests:
   piped-test:

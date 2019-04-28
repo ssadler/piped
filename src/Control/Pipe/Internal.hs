@@ -1,72 +1,77 @@
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE TupleSections #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE UndecidableInstances #-}
 
 module Control.Pipe.Internal
   ( Pipe(..)
-  , runPipe
-  , await
-  , yield
-  , termLeft
-  , (.|)
   , Await(..)
-  , runAwait
   , Yield(..)
-  , runYield
   , Await'
   , Yield'
+  , runPipe
+  , (.|)
+  , await
+  , yield
+  , runAwait
+  , runYield
+  , termLeft
+  , sinkVoid
+  , injectLeftover
   ) where
 
 
 import Data.Void
 
 import Control.Monad
+import Control.Monad.State
 import Control.Monad.Trans
-import Control.Monad.Trans.Resource
+
+import Debug.Trace
 
 -- | Await type; holds a callback that waits for a value
-newtype Await i a = Await { unAwait :: Await' i a }
+newtype Await i m a = Await { unAwait :: Await' i m a }
 
 -- | Yield type; holds a callback that yields a value
-data Yield i a = Yield
-  { terminate :: a
-  , unYield :: !(Yield' i a)
+data Yield i m a = Yield
+  { terminate :: m a
+  , unYield   :: Yield' i m a
   }
 
-type Await' i a = Yield i a -> a
+type Await' i m a = Yield i m a -> m a
 
-type Yield' i a = i -> Await i a -> a
+type Yield' i m a = i -> Await i m a -> m a
 
-runAwait :: Await i a -> a -> Yield' i a -> a
+runAwait :: Await i m a -> m a -> Yield' i m a -> m a
 runAwait (Await awt) a yld = awt $ Yield a yld
 {-# INLINE runAwait #-}
 
-runYield :: Yield i a -> i -> Await' i a -> a
+runYield :: Yield i m a -> i -> Await' i m a -> m a
 runYield (Yield _ a) i = a i . Await
 {-# INLINE runYield #-}
 
-termLeft :: Await i a
+termLeft :: Await i m a
 termLeft = Await terminate
 {-# INLINE termLeft #-}
 
+sinkVoid :: Yield Void m a
+sinkVoid = Yield (error "Void") (\i _ -> absurd i)
+
+injectLeftover :: i -> Await i m a -> Await i m a
+injectLeftover i await = Await $ \y -> unYield y i await
+
 -- | Left and right continuations
-type L i m r = Await i (m r)
-type R o m r = Yield o (m r)
+type Rest i o r m a = (Await i m r -> Yield o m r -> a -> m r)
 
 -- | Pipe datatype. 
 --
---   i = input
---
---   o = output
---
---   m = base monad
---
---   a = return type
---
 newtype Pipe i o m a =
-  Pipe { unPipe :: forall r. (L i m r -> R o m r -> a -> m r) -> L i m r -> R o m r -> m r }
+  Pipe { unPipe :: forall r. Rest i o r m a -> Await i m r -> Yield o m r -> m r }
 
 instance Monad m => Functor (Pipe i o m) where
-  fmap f (Pipe p) = Pipe $ \rest l r -> p (\l r -> rest l r . f) l r
+  fmap f (Pipe p) = Pipe $
+    \rest l r -> p (\l r -> rest l r . f) l r
 
 instance Monad m => Applicative (Pipe i o m) where
   pure = return
@@ -83,26 +88,22 @@ instance MonadTrans (Pipe i o) where
 instance MonadIO m => MonadIO (Pipe i o m) where
   liftIO = lift . liftIO
 
-instance MonadResource m => MonadResource (Pipe i o m) where
-  liftResourceT = lift . liftResourceT
-
-instance MonadThrow m => MonadThrow (Pipe i o m) where
-  throwM = lift . throwM
-
-instance Monad m => Semigroup (Pipe i o m ()) where
+instance Monad m => Semigroup (Pipe i o m a) where
   (<>) = (>>)
 
 instance Monad m => Monoid (Pipe i o m ()) where
   mempty = pure ()
 
+instance MonadState s m => MonadState s (Pipe i o m) where
+  get = lift get
+  put = lift . put
 
--- | 
+-- | Await a value. If there are no more values, Nothing is retuend.
 --
-await :: Pipe i o m a -> (i -> Pipe i o m a) -> Pipe i o m a
-await def act = Pipe $
+await :: Monad m => Pipe i o m (Maybe i)
+await = Pipe $
   \rest a y ->
-    let run act awt = unPipe act rest awt y
-     in runAwait a (run def a) $ \i a' -> run (act i) a'
+    runAwait a (rest termLeft y Nothing) $ \i a -> rest a y (Just i)
 {-# INLINE await #-}
 
 
@@ -113,22 +114,20 @@ yield i = Pipe $
   \rest a y -> runYield y i $ \y' -> rest a y' ()
 {-# INLINE yield #-}
 
+
 -- | Run pipe to completion.
 --
 runPipe :: Monad m => Pipe () Void m r -> m r
-runPipe pipe = unPipe pipe (\_ _ -> pure) termLeft voidOut
-  where
-    voidOut = Yield (error "Void") (\i _ -> absurd i)
+runPipe pipe = unPipe pipe (\_ _ -> pure) termLeft sinkVoid
+{-# INLINE runPipe #-}
+
 
 -- | Compose a pipe with another pipe; the return type is that of the second pipe.
 --
-(.|) :: forall i o e m b. Pipe i e m () -> Pipe e o m b -> Pipe i o m b
+(.|) :: forall i o e m b. Monad m => Pipe i e m () -> Pipe e o m b -> Pipe i o m b
 (Pipe f1) .| (Pipe f2) =
-  Pipe $ \rest l r -> do
-    let goRight left = f2 (\_ -> rest termLeft) left r
-        one i left = Await $ \y -> unYield y i left
-        yieldRight i left = goRight (one i left)
-        termRight = goRight termLeft
-    -- The yield right function triggers the right hand pipe
-    -- The return method terminates to the right
-    f1 (\_ y () -> terminate y) l (Yield termRight yieldRight)
+  Pipe $ \rest l r ->
+    f1 (\_ y () -> terminate y) l $
+      Yield
+        (           f2 (\_ -> rest termLeft) termLeft                 r)
+        (\i left -> f2 (\_ -> rest termLeft) (injectLeftover i left)  r)

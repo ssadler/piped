@@ -20,6 +20,7 @@ module TestPipes
 import qualified Data.Conduit as C
 import qualified Data.Conduit.Combinators as C
 import qualified Control.Pipe as P
+import qualified Control.Pipe.Internal as P
 import Control.Monad.State
 
 import Data.Void
