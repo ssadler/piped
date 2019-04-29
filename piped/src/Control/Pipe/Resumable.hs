@@ -27,8 +27,8 @@ runResumable :: Monad m
 runResumable (Pipe f1) (Pipe f2) = do
    f1 resumeRight termLeft $
      Yield
-       (           f2 resumeLeft termLeft         sinkVoid)
-       (\i left -> f2 resumeLeft (prepend i left) sinkVoid)
+       (           f2 resumeLeft termLeft         voidRight)
+       (\i left -> f2 resumeLeft (prepend i left) voidRight)
   where
     prepend i left = Await $ \y -> unYield y i left
     resumeRight _ yield a = pure $ RightPipe yield a

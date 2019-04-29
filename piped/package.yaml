@@ -26,19 +26,27 @@ dependencies:
 library:
   source-dirs: src
 
-benchmarks:
+executables:
   piped-bench:
     main:                Bench.hs
     source-dirs:         bench
+    when:
+    - condition: (flag(build-bench))
+      then:
+        buildable: true
+      else:
+        buildable: false
     ghc-options:
     - -rtsopts
     - -O2
     - -fprof-auto
     dependencies:
     - piped
-    - criterion == 1.4.1.0
+    - gauge
+    - random
     default-extensions:
     - LambdaCase
+    - FlexibleContexts
 
 tests:
   piped-test:
@@ -51,7 +59,6 @@ tests:
     - -with-rtsopts=-N
     dependencies:
     - piped
-    - piped-conduit
     - tasty
     - tasty-hunit
     - tasty-discover
@@ -61,3 +68,9 @@ tests:
     - conduit
     default-extensions:
     - RankNTypes
+
+flags:
+  build-bench:
+    description: Enable build benchmark
+    manual: true
+    default: false

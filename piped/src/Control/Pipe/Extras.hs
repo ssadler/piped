@@ -1,5 +1,6 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE BangPatterns #-}
 
 module Control.Pipe.Extras where
 
@@ -18,54 +19,58 @@ yieldM = (>>= yield)
 map :: Monad m => (i -> o) -> Pipe i o m ()
 map f = awaitForever $ yield . f
 
--- scanl :: Monad m => (a -> b -> a) -> a -> Pipe b a m ()
--- scanl f =
---   fix $ \next s ->
---     let go i = yield s >> next (f s i)
---      in awaitMaybe (yield s) go
-
 scanl :: forall i o m. (o -> i -> o) -> o -> Pipe i o m ()
 scanl f s = Pipe $
   \rest ->
     fix1 s $
-      \next s l r ->
+      \next !s l r ->
         runYield r s $ \r -> 
           let end = rest l r ()
-           in runAwait l end $ \i l ->
-                let s' = f s i
-                 in s' `seq` next s' l r
+           in runAwait l end $ \i l -> next (f s i) l r
+{-# INLINE scanl #-}
 
 sourceList :: Monad m => [o] -> Pipe () o m ()
 sourceList = foldMap yield
 
--- | Consume all input and return a list
-sinkList :: Monad m => Pipe i Void m [i]
-sinkList = let f = awaitMaybe (pure []) (\i -> (i:) <$> f) in f
+-- | Return all input values as a list.
+sinkList :: Pipe i Void m [i]
+sinkList = Pipe $
+  \rest l r ->
+    fix2 l id $
+      \go l fxs ->
+        let term = rest termLeft r (fxs [])
+         in runAwait l term $ \i yield -> go yield $ fxs . (i:)
+{-# INLINE sinkList #-}
 
 -- | Consume all values using given function
-awaitForever :: Monad m => (i -> Pipe i o m ()) -> Pipe i o m ()
+awaitForever :: Monad m => (i -> Pipe i o m a) -> Pipe i o m ()
 awaitForever f = Pipe $
   \rest ->
     fix $
       \next await yield -> 
         runAwait await (rest termLeft yield ()) $
           \i await ->
-            unPipe (f i) (\l r () -> next l r) await yield
+            unPipe (f i) (\l r _ -> next l r) await yield
+{-# INLINE awaitForever #-}
 
-foldl :: Monad m => (a -> i -> a) -> a -> Pipe i Void m a
+-- | Left fold
+foldl :: Monad m => (a -> i -> a) -> a -> Pipe i o m a
 foldl f start = Pipe $
   \rest ->
     fix1 start $
-      \next s l r ->
+      \next !s l r ->
         runAwait l (rest termLeft r s) $
           \i await -> next (f s i) await r
+{-# INLINE foldl #-}
 
+-- | Discard all input values
 sinkNull :: Monad m => Pipe i Void m ()
 sinkNull = Pipe $
   \rest l r -> do
     let term = rest termLeft r ()
         f l = runAwait l term $ \_ -> f
      in f l
+{-# INLINE sinkNull #-}
 
 -- | Basically `await >>= maybe ...`.
 --
@@ -85,23 +90,31 @@ awaitJust act = Pipe $
 {-# INLINE awaitJust #-}
 
 takeWhile_ :: Monad m => (i -> Bool) -> Pipe i i m ()
-takeWhile_ f = Pipe $
-  \rest ->
-    fix $ \next l r ->
-      runAwait l (rest termLeft r ()) $ \i l ->
-        if f i
-           then runYield r i $ next l
-           else rest l r ()
-
+takeWhile_ f = awaitForever $ \i -> if f i then yield i else pure ()
 
 dropWhile_ :: Monad m => (i -> Bool) -> Pipe i i m ()
-dropWhile_ f = Pipe $
-  \rest ->
-    fix $ \next l r ->
-      runAwait l (rest termLeft r ()) $ \i l ->
-        if f i
-           then next l r
-           else unPipe identity_ rest l r
+dropWhile_ f =
+  awaitForever $ \i -> if f i then pure () else yield i >> identity_
+
+
+
+-- takeWhile_ f = Pipe $
+--   \rest ->
+--     fix $ \next l r ->
+--       runAwait l (rest termLeft r ()) $ \i l ->
+--         if f i
+--            then runYield r i $ next l
+--            else rest l r ()
+-- 
+-- 
+-- dropWhile_ :: Monad m => (i -> Bool) -> Pipe i i m ()
+-- dropWhile_ f = Pipe $
+--   \rest ->
+--     fix $ \next l r ->
+--       runAwait l (rest termLeft r ()) $ \i l ->
+--         if f i
+--            then next l r
+--            else unPipe identity_ rest l r
 
 identity_ :: Monad m => Pipe i i m ()
 identity_ = awaitForever yield
@@ -154,4 +167,6 @@ bracketP alloc free inside = Pipe $
 
 fix1 :: a -> ((a -> b) -> a -> b) -> b
 fix1 a f = fix f a
-
+{-# INLINE fix1 #-}
+fix2 a b f = fix f a b
+{-# INLINE fix2 #-}

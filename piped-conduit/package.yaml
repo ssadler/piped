@@ -15,3 +15,23 @@ dependencies:
 
 library:
   source-dirs: src
+
+executables:
+  piped-bench-conduit:
+    main:                Bench.hs
+    source-dirs:         bench
+    ghc-options:
+    - -rtsopts
+    - -O2
+    - -fprof-auto
+    dependencies:
+    - piped
+    - piped-conduit
+    - mtl
+    - conduit
+    - gauge
+    default-extensions:
+    - LambdaCase
+    - FlexibleContexts
+
+

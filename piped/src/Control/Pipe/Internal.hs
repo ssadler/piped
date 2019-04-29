@@ -17,7 +17,7 @@ module Control.Pipe.Internal
   , runAwait
   , runYield
   , termLeft
-  , sinkVoid
+  , voidRight
   , injectLeftover
   , Void
   ) where
@@ -56,8 +56,9 @@ termLeft :: Await i m a
 termLeft = Await terminate
 {-# INLINE termLeft #-}
 
-sinkVoid :: Yield Void m a
-sinkVoid = Yield (error "Void") (\i _ -> absurd i)
+voidRight :: Yield Void m a
+voidRight = Yield (error "Void") (\i _ -> absurd i)
+{-# INLINE voidRight #-}
 
 injectLeftover :: i -> Await i m a -> Await i m a
 injectLeftover i await = Await $ \y -> unYield y i await
@@ -103,8 +104,9 @@ instance MonadState s m => MonadState s (Pipe i o m) where
 --
 await :: Monad m => Pipe i o m (Maybe i)
 await = Pipe $
-  \rest a y ->
-    runAwait a (rest termLeft y Nothing) $ \i a -> rest a y (Just i)
+  \rest l r ->
+    let term = rest termLeft r Nothing
+     in runAwait l term $ \i l -> rest l r $ Just i
 {-# INLINE await #-}
 
 
@@ -112,14 +114,14 @@ await = Pipe $
 --
 yield :: o -> Pipe i o m ()
 yield i = Pipe $
-  \rest a y -> runYield y i $ \y' -> rest a y' ()
+  \rest a y -> runYield y i $ \y -> rest a y ()
 {-# INLINE yield #-}
 
 
 -- | Run pipe to completion.
 --
 runPipe :: Monad m => Pipe () Void m r -> m r
-runPipe pipe = unPipe pipe (\_ _ -> pure) termLeft sinkVoid
+runPipe pipe = unPipe pipe (\_ _ -> pure) termLeft voidRight
 {-# INLINE runPipe #-}
 
 
@@ -132,3 +134,4 @@ runPipe pipe = unPipe pipe (\_ _ -> pure) termLeft sinkVoid
       Yield
         (           f2 (\_ -> rest termLeft) termLeft                 r)
         (\i left -> f2 (\_ -> rest termLeft) (injectLeftover i left)  r)
+{-# INLINE (.|) #-}
