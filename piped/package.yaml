@@ -21,7 +21,6 @@ description:         Please see the README on GitHub at <https://github.com/gith
 dependencies:
 - base >= 4.7 && < 5
 - mtl
-- resourcet
 
 library:
   source-dirs: src
@@ -29,9 +28,11 @@ library:
 executables:
   piped-bench:
     main:                Bench.hs
-    source-dirs:         bench
+    source-dirs:
+    - test-bench
+    - test-common
     when:
-    - condition: (flag(build-bench))
+    - condition: (flag(bench))
       then:
         buildable: true
       else:
@@ -40,23 +41,29 @@ executables:
     - -rtsopts
     - -O2
     - -fprof-auto
+    - -fwarn-unused-imports
     dependencies:
     - piped
+    - conduit
+    - mtl
     - gauge
-    - random
+    - bench-show
+    - split
     default-extensions:
     - LambdaCase
     - FlexibleContexts
 
 tests:
   piped-test:
-    main:                Driver.hs
+    main:                Discover.hs
     source-dirs:
     - test
+    - test-common
     ghc-options:
     - -threaded
     - -rtsopts
     - -with-rtsopts=-N
+    - -fwarn-unused-imports
     dependencies:
     - piped
     - tasty
@@ -66,11 +73,20 @@ tests:
     - tasty-quickcheck
     - quickcheck-instances
     - conduit
+    - microlens-platform
     default-extensions:
     - RankNTypes
+    - MultiParamTypeClasses
+    - FunctionalDependencies
+    - FlexibleInstances
+    - ConstraintKinds
+    - TypeSynonymInstances
+    - AllowAmbiguousTypes
+    - LambdaCase
+    - FlexibleContexts
 
 flags:
-  build-bench:
+  bench:
     description: Enable build benchmark
     manual: true
     default: false

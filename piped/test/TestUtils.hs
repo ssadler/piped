@@ -8,5 +8,5 @@ import Data.IORef as T
 import Test.Tasty as T
 import Test.Tasty.HUnit as T
 
-import Control.Pipe as T
-import Control.Pipe.Internal as T
+import Piped as T
+import Piped.Internal as T

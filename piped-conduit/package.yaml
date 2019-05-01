@@ -1,12 +1,11 @@
 name:                piped-conduit
 version:             0.1.0.0
-github:              "githubuser/piped-conduit"
 license:             BSD3
 author:              "Author name here"
 maintainer:          "example@example.com"
 copyright:           "2019 Author name here"
 
-description:         Please see the README on GitHub at <https://github.com/githubuser/piped-conduit#readme>
+description:         Conduit adapter for Piped
 
 dependencies:
 - base >= 4.7 && < 5
@@ -15,23 +14,3 @@ dependencies:
 
 library:
   source-dirs: src
-
-executables:
-  piped-bench-conduit:
-    main:                Bench.hs
-    source-dirs:         bench
-    ghc-options:
-    - -rtsopts
-    - -O2
-    - -fprof-auto
-    dependencies:
-    - piped
-    - piped-conduit
-    - mtl
-    - conduit
-    - gauge
-    default-extensions:
-    - LambdaCase
-    - FlexibleContexts
-
-
