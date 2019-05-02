@@ -9,12 +9,13 @@ module Piped.Internal
   (
   -- ** Pipe
   --
-  -- | Piped is implemented using a type of codensity transform, that uses left and right continuations, rather than sum types, to propagate state transitions. Cutting out the middleman, so to speak.
+  -- | Piped is implemented using a type of codensity transform, that uses left and right continuations, rather than sum types, to propagate state transitions.
   --
     Pipe(..)
   , await
   , yield
   , runPipe
+  , leftover
 
   -- ** Continuations
   --
@@ -165,6 +166,14 @@ yield i = Pipe $
 runPipe :: Monad m => Pipe () Void m r -> m r
 runPipe pipe = unPipe pipe (\_ _ -> pure) termLeft voidRight
 {-# INLINE runPipe #-}
+
+
+-- | Push a value back into the incoming pipeline
+--
+leftover :: i -> Pipe i o m ()
+leftover i = Pipe $
+  \rest l r -> rest (addLeftover i l) r ()
+{-# INLINE leftover #-}
 
 
 -- `fix` providing one value.

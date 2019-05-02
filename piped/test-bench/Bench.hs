@@ -3,15 +3,13 @@ module Main where
 
 import BenchShow
 import Gauge.Main
+import Control.Exception
 import Data.List.Split
 import System.Environment (getArgs)
 
 import BenchYields
 import BenchPipes
 import BenchCompare
-
-import Piped
-import Conduit
 
 
 main = do
@@ -22,43 +20,33 @@ main = do
        defaultMain
         [ benchPipes
         , benchYields
-        , benchCompare "vs_typical" comparePipes
-        , benchCompare "vs_stages" compareIdents
+        , benchCompare
         ]
 
 
 renderCharts file = do
   -- report file Nothing defaultConfig { presentation = Fields }
   
-  graph file "vs_typical" $
-    defaultConfig
-      { classifyBenchmark = \name ->
-          case splitOn "/" name of
-            ["vs_typical", b, c]   -> Just (c, b)
-            _                      -> Nothing
-      }
-  
-  graph file "vs_stages" $
-    defaultConfig
-      { classifyBenchmark = \name ->
-          case splitOn "/" name of
-            ["vs_stages", b, c]   -> Just (c, b)
-            _                      -> Nothing
-      }
+  stdgraph "mixed_naive" $ drop 1
+  stdgraph "n_stages" $ drop 1
+  stdgraph "mixed_optimised" $ drop 1
   
   graph file "yielding_vs_monadic" $
     defaultConfig
       { classifyBenchmark = \name ->
           case splitOn "/" name of
-            ["pipes", b, c]   -> Just (c, b)
-            _                 -> Nothing
+            ["pipes", b, c] -> Just (c, b)
+            _               -> Nothing
       }
 
-
-benchCompare name pipes = bgroup name $ compare <$> pipes
   where
-    iter = 1000000
-    compare (name, p, c) = bgroup name $
-      [ bench "conduit" $ whnfAppIO (runConduit . c) iter
-      , bench "piped"   $ whnfAppIO (runPipe    . p) iter
-      ]
+    stdgraph name f =
+      handle (\e -> print (e::SomeException)) $
+        graph file name $
+          defaultConfig
+            { classifyBenchmark = \s ->
+                case f (splitOn "/" s) of
+                  [a, b, c] | a == name -> Just (c, b)
+                  _                     -> Nothing
+            , title = Just name
+            }

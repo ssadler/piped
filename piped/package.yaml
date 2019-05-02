@@ -72,6 +72,7 @@ tests:
     - tasty-golden
     - tasty-quickcheck
     - quickcheck-instances
+    - gauge
     - conduit
     - microlens-platform
     default-extensions:

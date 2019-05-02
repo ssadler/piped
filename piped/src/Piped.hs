@@ -9,6 +9,7 @@ module Piped (
   , (.|)
   , (|.)
   , runPipe
+  , leftover
 
   -- Barebones API
   

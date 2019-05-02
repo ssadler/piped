@@ -12,6 +12,7 @@ module Piped.Prelude
   , module Piped.Prelude
   ) where
 
+import Control.Monad
 import Control.Monad.Trans
 
 import Prelude hiding (foldl, scanl, mapM_, last, take, drop, zipWith)
@@ -20,22 +21,26 @@ import Piped
 import Piped.Internal
 
 
--- | Yield elements passing a test
+-- | Yield only elements satisfying a predicate.
 --
 filter :: Monad m => (i -> Bool) -> Pipe i i m ()
 filter f = awaitForever $ \i -> if f i then yield i else pure ()
 {-# INLINE filter #-}
 
--- | Consume values while they satisfy a predicate, then don't consume anymore.
+-- | Yield values while they satisfy a predicate, then return.
 --
 takeWhile :: Monad m => (i -> Bool) -> Pipe i i m ()
-takeWhile f = awaitForever $ \i -> if f i then yield i else pure ()
+takeWhile f = go where
+  go = awaitJust $ \i -> if f i then yield i >> go else leftover i
 {-# INLINE takeWhile #-}
 
--- | Drop values while they satisfy a predicate, then consume all values.
-dropWhile :: Monad m => (i -> Bool) -> Pipe i i m ()
-dropWhile f =
-  awaitForever $ \i -> if f i then pure () else yield i >> identity
+-- | Drop values while they satisfy a predicate, then return.
+--
+--   Note: this does not yield any values, and should be combined with (>>).
+--
+dropWhile :: Monad m => (i -> Bool) -> Pipe i o m ()
+dropWhile f = go where
+  go = awaitJust $ \i -> if f i then go else leftover i
 {-# INLINE dropWhile #-}
 
 -- | Equivalent to `map id`.
@@ -67,14 +72,17 @@ foldl f start = Pipe $
           \i l -> next (f s i) l r
 {-# INLINE foldl #-}
 
--- | Drop n values
+-- | Drop n values.
 --
-drop :: Monad m => Int -> Pipe i i m ()
-drop 0 = identity
-drop n = awaitJust (\i -> yield i >> drop (n-1))
+--   Note: This will not yield values and should be combined with `>>`
+--
+drop :: Monad m => Int -> Pipe i o m ()
+drop 0 = pure ()
+drop n = awaitJust (\_ -> drop $ n-1)
 {-# INLINE drop #-}
 
 -- | Take n values.
+--
 take :: Monad m => Int -> Pipe i i m ()
 take 0 = pure ()
 take n = awaitJust $ \i -> yield i >> take (n-1)

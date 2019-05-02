@@ -23,8 +23,8 @@ benchPipes = bgroup "pipes"
                        , bench "yielding" $ nfAppIO (runSink sinkList) 1000
                        ]
 
-  , bgroup "foldl"     [ bench "monadic" $ nfAppIO (bFoldlM) 10000
-                       , bench "yielding" $ nfAppIO (bFoldlY) 10000
+  , bgroup "foldl"     [ bench "monadic" $ nfAppIO bFoldlM 10000
+                       , bench "yielding" $ nfAppIO bFoldlY 10000
                        ]
 
   , bgroup "scanl"     [ bench "monadic" $ nfAppIO bScanlM 10000

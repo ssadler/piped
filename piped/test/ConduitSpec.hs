@@ -1,63 +1,54 @@
 
-module ConduitSpec
-  ( module ConduitSpec
-  , C.runConduit
-  , P.runPipe
-  ) where
+module ConduitSpec where
 
 import qualified Data.Conduit as C
 import qualified Piped as P
 import Control.Monad.State
 
-import Data.Void
-import Test.Tasty
 import Test.Tasty.HUnit
 
-import PipeLike
-import BenchCompare
+import PipeLike as PL
 
 
+-- | Below tests polymorphic pipeline definitions using Piped and Conduit.
+--   The application of () is because for some reason GHC will allow 
+--   polymorphic definitions without signatures if an argument is passed,
+--   event a useless one.
 
-type TestPipe p a = p () Void (StateT [Int] IO) a
+test_1 = test "demand driven" p p
+  where
+    p _ = undefined .| (pure ())
 
-test_units :: TestTree
-test_units = testGroup "Conduit spec" $
-  [ t "simple" simple simple
-  , t "yield await" yieldAwait yieldAwait
-  , t "sinkList" sinkList_ sinkList_
-  , t "termOrder1" termOrder1 termOrder1
-  , t "termOrder2" termOrder1 termOrder1
-  , t "resursive pipe" recursive recursive
-  ]
-    ++ [t ("compare:" ++ s) c p | (s, p, c) <- comparePipes]
+test_2 = test "sinkList correct order" p p
+  where
+    p _ = mapM_ yield [True, False] .| sinkList
 
-    where
-      t s p c = testCompare s (p 2) (c 2)
+test_3 = test "dropWhile doesn't consume" p p
+  where
+    p _ = sourceList [1..10] .| (PL.dropWhile (<5) >> leftover (-1) >> sinkList)
 
-      testCompare :: (Eq a, Show a)
-                  => String -> TestPipe C.ConduitT a -> TestPipe P.Pipe a -> TestTree
-      testCompare s c p = testCase s $ do
-        cr <- runStateT (C.runConduit c) []
-        pr <- runStateT (P.runPipe    p) []
-        pr @?= cr
+test_4 = test "takeWhile doesn't drop values" p p
+  where
+    p _ = sourceList [1..10] .| (PL.takeWhile (<5) >> PL.map (+1)) .| sinkList
+
+test_44 = test "take doesn't drop values" p p
+  where
+    p _ = sourceList [1..10] .| PL.take 5 .| sinkList
+
+test_45 = test "drop doesn't yield values" p p
+  where
+    p _ = sourceList [1..10] .| (PL.drop 5 >> PL.map (+1)) .| sinkList
+
+test_5 = test "recursive pipes don't do funny things" p p
+  where
+    p _ = go 2
+    go 0 = await >> pure True
+    go n = yield () .| (await >> go (n-1))
+
+test_6 = test "foldl works as expected" p p
+  where
+    p _ = sourceList [True, False, True] .| PL.foldl (flip (:)) []
 
 
-
-alloc n act = do
-  modify $ (++ [n*(-1)])
-  act
-  modify $ (++ [n])
-
-simple _ = pure 1
-
-yieldAwait _ = alloc 2 (yield 1) .| alloc 1 await
-
-sinkList_ _ = mapM_ yield [True, False] .| sinkList
-
-termOrder1 _ = pure () .| (await >> pure ()) .| (await >> pure True)
-
-termOrder2 _ = alloc 1 await >> alloc 2 await
-
-recursive _ = go 2 where
-  go 0 = await >> pure True
-  go n = yield () .| (await >> go (n-1))
+test s p c = testCompare s (p ()) (c ())
+testCompare s c p = testCase s $ join $ (@?=) <$> P.runPipe p <*> C.runConduit c
