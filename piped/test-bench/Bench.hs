@@ -4,6 +4,7 @@ module Main where
 import BenchShow
 import Gauge.Main
 import Control.Exception
+import Data.List (sortOn)
 import Data.List.Split
 import System.Environment (getArgs)
 
@@ -25,8 +26,6 @@ main = do
 
 
 renderCharts file = do
-  -- report file Nothing defaultConfig { presentation = Fields }
-  
   stdgraph "mixed_naive" $ drop 1
   stdgraph "n_stages" $ drop 1
   stdgraph "mixed_optimised" $ drop 1
@@ -49,4 +48,5 @@ renderCharts file = do
                   [a, b, c] | a == name -> Just (c, b)
                   _                     -> Nothing
             , title = Just name
+            , selectGroups = sortOn $ (/="piped") . fst
             }

@@ -1,8 +1,7 @@
-
-module Piped.Extras where
-
 -- | Convenience methods, plus 'bracketPipe'.
 --
+
+module Piped.Extras where
 
 import Data.Function
 

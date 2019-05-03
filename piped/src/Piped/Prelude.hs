@@ -5,12 +5,8 @@
 -- | Basic functionality, closely mirroring the list / Foldable api from Prelude.
 --
 -- This module should be imported qualified i.e. `import Piped.Prelude as P`.
--- It also re-exports `Piped`.
 --
-module Piped.Prelude
-  ( module Piped
-  , module Piped.Prelude
-  ) where
+module Piped.Prelude where
 
 import Control.Monad
 import Control.Monad.Trans

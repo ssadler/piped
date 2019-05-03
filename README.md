@@ -7,8 +7,8 @@ It was built as a learning exercise and to test the idea of a streaming library 
 ## Features
 
 * Depends only on `base` and `mtl`.
-* Piped are resumable via `import Piped.Resume`.
-* Piped can be composed demand driven (the default, with `.|`) or supply driven (`|.`).
+* Flexible composition; demand or supply driven, plus different termination modes.
+* Pipes are resumable.
 * Composable with existing Conduit pipes using `fromConduit` in piped-conduit.
 
 ## Quickstart
@@ -24,14 +24,14 @@ runPiped $ sourceList [1,2,3] .| P.map (+1) .| sinkList
 
 ## Performance
 
-Piped implements a similar scheme to the one described in [this paper](https://www.semanticscholar.org/paper/Faster-coroutine-pipelines-Spivey/003ae593edc83996b550bf53c865f2f33bfc1c67). In this section you can see benchmarks between Piped and Conduit. On very short (source direct to sink) pipelines, Piped is faster by a small margin. However, this margin grows quickly as the number of stages increases. For a pipeline with 4 stages (source-a-b-sink), Piped is roughly twice as fast.
+There isn't a huge difference in performance for small pipelines. Maybe up to about 15% in some cases. However, once you have more stages (source-pipe-pipe-sink) or more, there is a large margin, about 50%. Of course, unless your application is shuttling millions of events per second it doens't make alot of difference, in practice.
+
+#### How performance changes with additional stages
+<img src="charts/n_stages-median-Mean.svg" width="400" height="300">
 
 #### Naive implementations of common functions
 <img src="charts/mixed_naive-median-Mean.svg" width="400" height="300">
 
 #### Hand-optimised implementations of common functions (taking advantage of fusion etc)
 <img src="charts/mixed_optimised-median-Mean.svg" width="400" height="300">
-
-#### How performance changes with additional stages
-<img src="charts/n_stages-median-Mean.svg" width="400" height="300">
 

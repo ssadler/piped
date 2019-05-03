@@ -6,30 +6,27 @@ function build () {
 	stack build --flag piped:bench piped:piped-bench
 }
 function run () {
-    build
 	stack exec piped-bench -- $@
 }
 function charts () {
-    cd charts
-	stack exec piped-bench -- charts report.csv
-    cd ..
+    ( cd charts && stack exec piped-bench -- charts report.csv )
 }
 function all () {
 	[[ -d charts ]] && rm -rf charts1 && mv charts charts1 || true
 	mkdir charts
-    cd charts
-    run --csv "report.csv" $@
-    cd ..
+    build
+    ( cd charts; run --csv "report.csv" $@ )
     charts
 }
-function main () (
+function main () {
     cmd="$1"
-    shift
     if [ ! -z "$cmd" ];
     then
+        shift
         $cmd $@
     else
         run --quick
     fi
-)
+}
+
 main $@
