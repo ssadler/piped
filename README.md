@@ -1,6 +1,6 @@
 # Piped
 
-Piped is a is a very performant coroutine based steaming library with minimal dependencies.
+Piped is a is a performant coroutine based steaming library with minimal dependencies.
 
 It was built as a learning exercise and to test the idea of a streaming library without using a sum type to represent state changes. It owes alot to Conduit; the contination passing monad, the default behaviours (demand driven, auto terminating), plus the major part of it's API.
 

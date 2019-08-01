@@ -27,7 +27,7 @@ module Piped.Compose
   -- ** Demand driven
   --
   -- | The right hand side is run first. The left hand side is only
-  --   invoked by calling `yield`.
+  --   invoked by calling `await`.
   --
   , composeDemand
   , composeDemandEither
@@ -51,7 +51,7 @@ import Piped.Internal
 {-# INLINE (.|) #-}
 
 
--- | Supply driven; same as 'composeSupplyLeft'
+-- | Supply driven; same as 'composeSupplyEither
 --
 (|.) :: Monad m => Pipe i e m a -> Pipe e o m a -> Pipe i o m a
 (|.) = composeSupplyEither

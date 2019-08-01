@@ -76,6 +76,7 @@ runAwait (Await awt) a yld = awt $ Yield a yld
 {-# INLINE runAwait #-}
 
 -- | Run a Yield
+--
 runYield :: Yield i m a -> i -> Await' i m a -> m a
 runYield (Yield _ a) i = a i . Await
 {-# INLINE runYield #-}
